@@ -1,0 +1,1 @@
+g++ -w -I /usr/local/autodiff/include main.cpp
