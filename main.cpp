@@ -60,13 +60,20 @@ int main()
     for (var val : x) cout << val << " ";
     cout << endl;
 
-    // Compute function output
-    vector<var> y = iterative_function(x);
     auto start_fd = high_resolution_clock::now();
-    vector<vector<var>> ux = derivatives(y, wrt(x));
     auto end_fd = high_resolution_clock::now();
     auto duration_fd = duration_cast<microseconds>(end_fd - start_fd);
+
+    // Compute function output
+    vector<var> y = iterative_function(x);
+
+    /* Comment from here */
+    start_fd = high_resolution_clock::now();
+    vector<vector<var>> ux = derivatives(y, wrt(x));
+    end_fd = high_resolution_clock::now();
+    duration_fd = duration_cast<microseconds>(end_fd - start_fd);
     cout << "Auto Gradient Time: " << duration_fd.count() << " µs" << endl;
+    /* for the code to compile and run properly */
 
     cout << "Output y: ";
     for (var val : y) cout << val << " ";
