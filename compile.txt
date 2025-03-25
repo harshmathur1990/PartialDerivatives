@@ -1,1 +1,2 @@
-g++ -w -I /usr/local/autodiff/include main.cpp
+export LD_LIBRARY_PATH=/usr/local/Adept-2/lib:$LD_LIBRARY_PATH
+g++ main.cpp -I/usr/local/Adept-2/include -L/usr/local/Adept-2/lib -ladept

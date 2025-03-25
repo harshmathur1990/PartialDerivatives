@@ -1,99 +1,98 @@
-//
-// Created by Harsh on 20-03-2025.
-//
-
 #include <iostream>
-#include <vector>
-#include <cmath>
 #include <chrono>
-#include <autodiff/reverse/var/var.hpp>
+#include <adept_arrays.h>
+// Adept vectors know their own length, so lengths do not need to be
+// passed in as well
 
-using namespace std;
-using namespace std::chrono;
+adept::aVector algorithm2(const adept::aVector& x) {
 
-using namespace autodiff;
+    adept::aVector y(5);
 
-// Function to simulate an iterative process that converges
-vector<var> iterative_function(vector<var> x) {
-    vector<var> y;
+    // Nested loops to enforce O(n^4) complexity
+    for (size_t j = 0; j < 5; ++j) {
+        adept::adouble sum = 0.0;
+        adept::adouble a = x[2 * j];       // First value in the pair
+        adept::adouble b = x[2 * j + 1];   // Second value in the pair
 
-    y.resize(x.size() / 2);
-
-    for (size_t i = 0; i < y.size(); ++i) {
-        var temp = 0;
-        for (size_t j = 0; j < x.size(); ++j) {
-            temp += x[j] * (j + 3) * (i + 5) / 150;
+        // O(n^4) computation
+        for (adept::adouble a_i = 0; a_i < 10; a_i += 1) {
+            for (adept::adouble b_i = 0; b_i < 10; b_i += 1) {
+                for (adept::adouble c_i = 0; c_i < 10; c_i += 1) {
+                    for (adept::adouble d_i = 0; d_i < 10; d_i += 1) {
+                        sum += adept::pow(a + b, 1.01);
+                    }
+                }
+            }
         }
-        y[i] = temp;
+
+        // Store the computed value in the output vector
+        y[j] = sum / 10000;  // Normalize to prevent overflow
     }
+
     return y;
 }
 
 
-vector<vector<var>> finite_difference_gradient(vector<var> x, var eps = 1e-5) {
-    vector<vector<var>> gradient(x.size());
+void algorithm2_jacobian(
+        const adept::Vector& x_val,
+        adept::Vector& y_val,
+        adept::Matrix& jac) {
+
+    adept::Stack stack;
+    adept::aVector x = x_val;
+    stack.new_recording();
+    adept::aVector y = algorithm2(x);
+    stack.independent(x);
+    stack.dependent(y);
+    stack.jacobian(jac);
+    y_val = value(y);
+}
+
+adept::Matrix finite_difference_gradient(const adept::Vector& x, double eps = 1e-5) {
+
+    adept::Stack stack;
+    adept::Matrix gradient(5, 10);
 
     for (size_t index = 0; index < x.size(); ++index) {
-        vector<var> x_plus(x);
-        vector<var> x_minus(x);
+        adept::aVector x_plus = x;
+        adept::aVector x_minus = x;
 
         x_plus[index] += eps;
         x_minus[index] -= eps;
 
-        vector<var> result_plus = iterative_function(x_plus);
-        vector<var> result_minus = iterative_function(x_minus);
-
-        gradient[index].resize(result_plus.size());
+        adept::aVector result_plus = algorithm2(x_plus);
+        adept::aVector result_minus = algorithm2(x_minus);
 
         for  (size_t jindex = 0; jindex < result_plus.size(); ++jindex) {
-            gradient[index][jindex] = (result_plus[jindex]  - result_minus[jindex]) / (2 * eps);
+            gradient[jindex][index] = (value(result_plus[jindex]) - value(result_minus[jindex])) / (2 * eps);
         }
     }
 
     return gradient;
 }
 
-int main()
-{
-    vector<var> x = {5.0, 10.0, 18.0, 25.0}; // Input array
-    cout << "Input x: ";
-    for (var val : x) cout << val << " ";
-    cout << endl;
+int main() {
 
-    auto start_fd = high_resolution_clock::now();
-    auto end_fd = high_resolution_clock::now();
-    auto duration_fd = duration_cast<microseconds>(end_fd - start_fd);
+    adept::Vector x = {5.0, 10.0, 18.0, 25.0, 30.0, 50.0, 90.0, 100.0, 30.0, 70.0};
+    adept::Vector y(5);
+    adept::Matrix jac(5, 10);
 
-    // Compute function output
-    vector<var> y = iterative_function(x);
+    auto start_fd =  std::chrono::high_resolution_clock::now();
+    algorithm2_jacobian(x, y, jac);
+    auto end_fd =  std::chrono::high_resolution_clock::now();
 
-    /* Comment from here */
-    start_fd = high_resolution_clock::now();
-    vector<vector<var>> ux = derivatives(y, wrt(x));
-    end_fd = high_resolution_clock::now();
-    duration_fd = duration_cast<microseconds>(end_fd - start_fd);
-    cout << "Auto Gradient Time: " << duration_fd.count() << " µs" << endl;
-    /* for the code to compile and run properly */
+    auto duration_fd =  std::chrono::duration_cast< std::chrono::microseconds>(end_fd - start_fd);
+    std::cout << "Auto Difference Time: " << duration_fd.count() << " µs" << std::endl;
 
-    cout << "Output y: ";
-    for (var val : y) cout << val << " ";
-    cout << endl;
+    std::cout << jac << std::endl;
 
-    start_fd = high_resolution_clock::now();
-    vector<vector<var>> gradient = finite_difference_gradient(x);
-    end_fd = high_resolution_clock::now();
-    duration_fd = duration_cast<microseconds>(end_fd - start_fd);
+    adept::Matrix jac2(5, 10);
+    start_fd =  std::chrono::high_resolution_clock::now();
+    jac2 = finite_difference_gradient(x);
+    end_fd =  std::chrono::high_resolution_clock::now();
 
-    cout << "Finite Difference Time: " << duration_fd.count() << " µs" << endl;
+    duration_fd =  std::chrono::duration_cast< std::chrono::microseconds>(end_fd - start_fd);
+    std::cout << "Finite Difference Time: " << duration_fd.count() << " µs" << std::endl;
 
-    cout << "Finite Difference Gradient:\n";
-    for  (size_t index = 0; index < gradient.size(); ++index) {
-        for  (size_t jindex = 0; jindex < gradient[index].size(); ++jindex) {
-            cout << gradient[index][jindex] << "\t";
-        }
-        cout<< endl;
-    }
-
-
-    return 0;
+    std::cout << jac2 << std::endl;
 }
